@@ -7,8 +7,7 @@ object Helper {
   def makePrettyJSON(a: Any, indent: String = ""): String = a match {
     case null => "null"
     case s: String => s
-    case i: Int => i.toString
-    case l: Seq[Any] => l.map(makePrettyJSON(_, indent + "  ")).mkString("[", ",", "]")
+    case l: Seq[Any] => l.map(makePrettyJSON(_, indent + "  ")).mkString("[", ", ", "]")
     case m: Map[Any, Any] =>
       val minimal = m.map {
         case (key, value) => makePrettyJSON(key) + ": " + makePrettyJSON(value)
