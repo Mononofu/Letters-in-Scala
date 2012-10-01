@@ -1,22 +1,47 @@
+object MyRichObject {
+var old: collection.SeqLike[_, _] = _
+}
+
 class MyRichObject[T](o: T) {
   // assert
-  def a(f: T => Boolean): T = {
+  def a(msg: String)(f: T => Boolean): T = {
     if(f(o)) o
-    else throw new Exception("assert failed")
+    else throw new Exception(msg)
   }
+
+  def a(f: T => Boolean): T = a("assert failed")(f)
 
   def b: T = o   // TODO: should beep
 
-  // TODO: remove this method from the stacktrace
   def c: T = {
-    (new Exception).printStackTrace()
+    val trace = Thread.currentThread().getStackTrace().drop(2)
+    for(e <- trace) {
+      println("\t at " + e)
+    }
     o
   }
 
   // TODO: diff object state between d1 and d2
   // needs to keep global state, best in companion object
-  def d1: T = o
-  def d2: T = o
+  def d1[U <: collection.SeqLike[_, _]]: T = {
+    o match {
+      case u: U => MyRichObject.old = u
+      case _ => throw new Exception("can't diff " + o)
+    }
+    o
+  }
+  def d2[U <: collection.SeqLike[_, _]]: T = {
+    o match {
+      case u: U =>
+        val removedE = MyRichObject.old filterNot(u contains)
+        var addedE = u filterNot(MyRichObject.old contains)
+        println("removed: " + removedE)
+        println("added: " + addedE)
+      case _ => throw new Exception("can't diff " + o)
+    }
+
+    o
+  }
 
   // assert not empy
   def e[U <: collection.GenTraversableOnce[_]]: T = o match {
@@ -60,8 +85,9 @@ object Letters extends App {
   implicit def ObjectToMyRichObject[T](o: T) = new MyRichObject(o)
 
   val l = List(1, 2, 3)
-  l.a { _.length == 3 }.e.foreach(println)
-  l.f.foreach(println)
+  l.a("len should be 3"){ _.length == 3 }.e.foreach(println)
+  l.f.c.foreach(println)
+  l.p.d1.map(n => n*n).d2.p
 
   val myObj: List[String] = null
   myObj.p.t
