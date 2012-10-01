@@ -1,5 +1,5 @@
 object MyRichObject {
-var old: collection.SeqLike[_, _] = _
+var old: collection.SeqLike[_, _] = null
 }
 
 class MyRichObject[T](o: T) {
@@ -26,18 +26,22 @@ class MyRichObject[T](o: T) {
   def d1[U <: collection.SeqLike[_, _]]: T = {
     o match {
       case u: U => MyRichObject.old = u
-      case _ => throw new Exception("can't diff " + o)
+      case _ => println("can't diff object since it's not SeqLike: " + o)
     }
     o
   }
   def d2[U <: collection.SeqLike[_, _]]: T = {
-    o match {
-      case u: U =>
-        val removedE = MyRichObject.old filterNot(u contains)
-        var addedE = u filterNot(MyRichObject.old contains)
-        println("removed: " + removedE)
-        println("added: " + addedE)
-      case _ => throw new Exception("can't diff " + o)
+    if(MyRichObject.old == null) {
+      println("you have to call d1 before calling d2")
+    } else {
+      o match {
+        case u: U =>
+          val removedE = MyRichObject.old filterNot(u contains)
+          var addedE = u filterNot(MyRichObject.old contains)
+          println("removed: " + removedE)
+          println("added: " + addedE)
+        case _ => println("can't diff object since it's not SeqLike: " + o)
+      }
     }
 
     o
