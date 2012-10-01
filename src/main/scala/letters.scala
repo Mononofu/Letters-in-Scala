@@ -1,6 +1,27 @@
 object MyRichObject {
-var old: collection.SeqLike[_, _] = null
+  var oldSeq: collection.SeqLike[_, _] = null
+  var oldMap: collection.MapLike[Any, _, _] = null
 }
+
+object Helper {
+  def makePrettyJSON(a: Any, indent: String = ""): String = a match {
+    case null => "null"
+    case s: String => s
+    case i: Int => i.toString
+    case l: Seq[Any] => l.map(makePrettyJSON(_, indent + "  ")).mkString("[", ",", "]")
+    case m: Map[Any, Any] =>
+      val minimal = m.map {
+        case (key, value) => makePrettyJSON(key) + ": " + makePrettyJSON(value)
+      }.mkString("{ ", ", ", " }")
+      if(minimal.length < 50) minimal
+      else m.map {
+        case (key, value) => "  " + indent + makePrettyJSON(key, indent + "  ") + ": " + makePrettyJSON(value, indent + "  ")
+      }.mkString(indent + "{\n", ",\n", "\n" + indent + "}")
+    case o => o.toString
+  }
+}
+
+import Helper._
 
 class MyRichObject[T](o: T) {
   // assert
@@ -14,6 +35,7 @@ class MyRichObject[T](o: T) {
   def b: T = o   // TODO: should beep
 
   def c: T = {
+    println("Current Callstack:")
     val trace = Thread.currentThread().getStackTrace().drop(2)
     for(e <- trace) {
       println("\t at " + e)
@@ -23,27 +45,41 @@ class MyRichObject[T](o: T) {
 
   // TODO: diff object state between d1 and d2
   // needs to keep global state, best in companion object
-  def d1[U <: collection.SeqLike[_, _]]: T = {
+  def d1[U <: collection.SeqLike[_, _], V <: collection.MapLike[Any, _, _]]: T = {
     o match {
-      case u: U => MyRichObject.old = u
+      case u: U => MyRichObject.oldSeq = u
+      case v: V => MyRichObject.oldMap = v
       case _ => println("can't diff object since it's not SeqLike: " + o)
     }
     o
   }
-  def d2[U <: collection.SeqLike[_, _]]: T = {
-    if(MyRichObject.old == null) {
+  def d2[U <: collection.SeqLike[_, _], V <: collection.MapLike[Any, _, _]]: T = {
+    if(MyRichObject.oldSeq == null) {
       println("you have to call d1 before calling d2")
     } else {
       o match {
         case u: U =>
-          val removedE = MyRichObject.old filterNot(u contains)
-          var addedE = u filterNot(MyRichObject.old contains)
-          println("removed: " + removedE)
-          println("added: " + addedE)
+          val removed = MyRichObject.oldSeq filterNot(u contains)
+          var added = u filterNot(MyRichObject.oldSeq contains)
+          println(makePrettyJSON(Map("removed" -> removed,
+                                     "added" -> added)))
+        case v: V =>
+          val removed = MyRichObject.oldMap filterNot {
+            case (key, value) => v.contains(key)
+          }
+          val added = v filterNot {
+            case (key, value) => MyRichObject.oldMap.contains(key)
+          }
+          val changed = v filter {
+            case (key, value) => MyRichObject.oldMap.contains(key) && MyRichObject.oldMap(key) != value
+          }
+          println(makePrettyJSON(Map("removed" -> removed,
+                                     "added" -> added,
+                                     "updated" -> changed)))
+
         case _ => println("can't diff object since it's not SeqLike: " + o)
       }
     }
-
     o
   }
 
@@ -73,7 +109,7 @@ class MyRichObject[T](o: T) {
   }
 
   def p: T = {
-    println(o)
+    println(makePrettyJSON(o))
     o
   }
 
@@ -95,4 +131,9 @@ object Letters extends App {
 
   val myObj: List[String] = null
   myObj.p.t
+
+  val m1 = Map(1 -> 5, 2 -> 6, 3 -> 7)
+  val m2 = Map(1 -> 5, 2 -> 8, 4 -> 10)
+  m1.p.d1
+  m2.d2.p
 }
